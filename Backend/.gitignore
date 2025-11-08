@@ -48,6 +48,7 @@ data/flood_pipeline_outputs/
 uploads/
 sam_masks_after/
 sam_masks_before/
+data/
 
 # Reports (generated)
 objects_change_report.csv

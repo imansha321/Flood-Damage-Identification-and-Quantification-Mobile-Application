@@ -102,6 +102,18 @@ export default function AnalyzeScreen() {
 
   const metrics = result?.metrics ?? {};
   
+  // Helpers
+  const isNum = (v: any) => typeof v === 'number' && isFinite(v);
+  const fmt = (v: any, digits = 2) =>
+    isNum(v)
+      ? Number(v).toLocaleString(undefined, {
+          minimumFractionDigits: digits,
+          maximumFractionDigits: digits,
+        })
+      : '—';
+  const pick = (backend?: number | null, fallback?: number | null) =>
+    isNum(backend) ? (backend as number) : isNum(fallback) ? (fallback as number) : null;
+  
   // Compute areas from pixel counts using detected pixel resolution when available
   const quantify = useMemo(() => {
     const res = typeof metrics?.pixel_resolution_m === 'number' && isFinite(metrics.pixel_resolution_m)
@@ -133,6 +145,25 @@ export default function AnalyzeScreen() {
       resolution_m: res,
     } as const;
   }, [metrics]);
+
+  // Prefer backend-provided areas, fall back to client-computed areas
+  const areas = useMemo(() => {
+    const flooded_m2_backend = (metrics?.total_flooded_area_m2 ?? metrics?.new_water_area_m2) as number | undefined;
+    const flooded_ha_backend = (metrics?.total_flooded_area_ha ?? metrics?.new_water_area_ha) as number | undefined;
+    const veg_m2_backend = metrics?.vegetation_loss_area_m2 as number | undefined;
+    const veg_ha_backend = metrics?.vegetation_loss_area_ha as number | undefined;
+    const built_m2_backend = metrics?.built_structures_affected_area_m2 as number | undefined;
+    const built_ha_backend = metrics?.built_structures_affected_area_ha as number | undefined;
+
+    return {
+      flooded_m2: pick(flooded_m2_backend, quantify?.flooded?.m2 ?? null),
+      flooded_ha: pick(flooded_ha_backend, quantify?.flooded?.ha ?? null),
+      veg_m2: pick(veg_m2_backend, quantify?.vegetation?.m2 ?? null),
+      veg_ha: pick(veg_ha_backend, quantify?.vegetation?.ha ?? null),
+      built_m2: pick(built_m2_backend, quantify?.built?.m2 ?? null),
+      built_ha: pick(built_ha_backend, quantify?.built?.ha ?? null),
+    } as const;
+  }, [metrics, quantify]);
 
   return (
     <ScrollView 
@@ -300,18 +331,14 @@ export default function AnalyzeScreen() {
                 <Text className="text-sm font-bold text-blue-900">💧 Flooded Land Area</Text>
               </View>
               <Text className="text-xs text-blue-700 mb-1">
-                {metrics.total_flooded_pixels ?? metrics.new_water_pixels ?? '—'} pixels
+                {fmt(metrics.total_flooded_pixels ?? metrics.new_water_pixels, 0)} pixels
               </Text>
-              {metrics.pixel_resolution_m && (
-                <>
-                  <Text className="text-xl font-bold text-blue-900 mt-1">
-                    {(metrics.total_flooded_area_m2 ?? metrics.new_water_area_m2)?.toFixed?.(2) ?? '—'} m²
-                  </Text>
-                  <Text className="text-xs text-blue-600 mt-1">
-                    {(metrics.total_flooded_area_ha ?? metrics.new_water_area_ha)?.toFixed?.(4) ?? '—'} hectares
-                  </Text>
-                </>
-              )}
+              <Text className="text-xl font-bold text-blue-900 mt-1">
+                {fmt(areas.flooded_m2, 2)} m²
+              </Text>
+              <Text className="text-xs text-blue-600 mt-1">
+                {fmt(areas.flooded_ha, 4)} hectares
+              </Text>
             </View>
 
             {/* Vegetation Loss */}
@@ -321,18 +348,14 @@ export default function AnalyzeScreen() {
                 <Text className="text-sm font-bold text-green-900">🌿 Vegetation Loss</Text>
               </View>
               <Text className="text-xs text-green-700 mb-1">
-                {metrics.vegetation_loss_pixels ?? '—'} pixels
+                {fmt(metrics.vegetation_loss_pixels, 0)} pixels
               </Text>
-              {metrics.pixel_resolution_m && (
-                <>
-                  <Text className="text-xl font-bold text-green-900 mt-1">
-                    {metrics.vegetation_loss_area_m2?.toFixed?.(2) ?? '—'} m²
-                  </Text>
-                  <Text className="text-xs text-green-600 mt-1">
-                    {metrics.vegetation_loss_area_ha?.toFixed?.(4) ?? '—'} hectares
-                  </Text>
-                </>
-              )}
+              <Text className="text-xl font-bold text-green-900 mt-1">
+                {fmt(areas.veg_m2, 2)} m²
+              </Text>
+              <Text className="text-xs text-green-600 mt-1">
+                {fmt(areas.veg_ha, 4)} hectares
+              </Text>
             </View>
 
             {/* Built Structures Affected */}
@@ -342,18 +365,14 @@ export default function AnalyzeScreen() {
                 <Text className="text-sm font-bold text-orange-900">🏘️ Built Structures Affected</Text>
               </View>
               <Text className="text-xs text-orange-700 mb-1">
-                {metrics.built_structures_affected_pixels ?? '—'} pixels
+                {fmt(metrics.built_structures_affected_pixels, 0)} pixels
               </Text>
-              {metrics.pixel_resolution_m && (
-                <>
-                  <Text className="text-xl font-bold text-orange-900 mt-1">
-                    {metrics.built_structures_affected_area_m2?.toFixed?.(2) ?? '—'} m²
-                  </Text>
-                  <Text className="text-xs text-orange-600 mt-1">
-                    {metrics.built_structures_affected_area_ha?.toFixed?.(4) ?? '—'} hectares
-                  </Text>
-                </>
-              )}
+              <Text className="text-xl font-bold text-orange-900 mt-1">
+                {fmt(areas.built_m2, 2)} m²
+              </Text>
+              <Text className="text-xs text-orange-600 mt-1">
+                {fmt(areas.built_ha, 4)} hectares
+              </Text>
             </View>
           </View>
 
@@ -373,45 +392,45 @@ export default function AnalyzeScreen() {
             <View className="bg-gradient-to-b from-emerald-50 to-white rounded-xl p-4 mb-4 border border-emerald-200">
               <Text className="text-base font-bold text-emerald-900 mb-3">🧮 Quantify Change</Text>
 
-              {/* Flooded land */}
+              {/* Flooded land (backend-preferred) */}
               <View className="mb-3">
                 <Text className="text-sm font-semibold text-gray-800">💧 Area of flooded land</Text>
                 <View className="flex-row items-baseline gap-2 mt-1">
                   <Text className="text-lg font-bold text-gray-900">
-                    {quantify.flooded?.m2?.toFixed?.(2) ?? '—'}
+                    {fmt(areas.flooded_m2, 2)}
                   </Text>
                   <Text className="text-xs text-gray-600">m²</Text>
                 </View>
                 <Text className="text-xs text-gray-700 mt-0.5">
-                  {quantify.flooded?.ha?.toFixed?.(4) ?? '—'} hectares
+                  {fmt(areas.flooded_ha, 4)} hectares
                 </Text>
               </View>
 
-              {/* Vegetation lost */}
+              {/* Vegetation lost (backend-preferred) */}
               <View className="mb-3">
                 <Text className="text-sm font-semibold text-gray-800">🌿 Area of vegetation lost</Text>
                 <View className="flex-row items-baseline gap-2 mt-1">
                   <Text className="text-lg font-bold text-gray-900">
-                    {quantify.vegetation?.m2?.toFixed?.(2) ?? '—'}
+                    {fmt(areas.veg_m2, 2)}
                   </Text>
                   <Text className="text-xs text-gray-600">m²</Text>
                 </View>
                 <Text className="text-xs text-gray-700 mt-0.5">
-                  {quantify.vegetation?.ha?.toFixed?.(4) ?? '—'} hectares
+                  {fmt(areas.veg_ha, 4)} hectares
                 </Text>
               </View>
 
-              {/* Built structures affected */}
+              {/* Built structures affected (backend-preferred) */}
               <View>
                 <Text className="text-sm font-semibold text-gray-800">🏘️ Area of affected built structures</Text>
                 <View className="flex-row items-baseline gap-2 mt-1">
                   <Text className="text-lg font-bold text-gray-900">
-                    {quantify.built?.m2?.toFixed?.(2) ?? '—'}
+                    {fmt(areas.built_m2, 2)}
                   </Text>
                   <Text className="text-xs text-gray-600">m²</Text>
                 </View>
                 <Text className="text-xs text-gray-700 mt-0.5">
-                  {quantify.built?.ha?.toFixed?.(4) ?? '—'} hectares
+                  {fmt(areas.built_ha, 4)} hectares
                 </Text>
               </View>
             </View>

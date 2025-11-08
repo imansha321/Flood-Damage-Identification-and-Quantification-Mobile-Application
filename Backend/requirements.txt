@@ -1,0 +1,33 @@
+# Backend Python dependencies for Flood Damage Analysis System
+#
+# Notes:
+# - Torch/torchvision will install CPU wheels by default. For NVIDIA GPU support, install via the CUDA-specific index URL from PyTorch docs.
+# - segment-anything is sourced from the official GitHub repo.
+
+fastapi
+uvicorn[standard]
+
+opencv-python
+pillow
+numpy
+pandas
+scipy
+scikit-image
+matplotlib
+imageio
+nbformat
+
+shapely
+rasterio
+geopandas
+
+# Required for FastAPI file uploads (multipart/form-data)
+python-multipart
+
+# Meta AI Segment Anything (SAM)
+# If Git is not available on your system, install Git or manually install the package from the repo.
+# CPU-only installs of PyTorch are fine; for GPU see https://pytorch.org/get-started/locally/
+torch
+torchvision
+
+git+https://github.com/facebookresearch/segment-anything.git
