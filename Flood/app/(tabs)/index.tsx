@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Linking } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
@@ -101,6 +101,38 @@ export default function AnalyzeScreen() {
   }, [result]);
 
   const metrics = result?.metrics ?? {};
+  
+  // Compute areas from pixel counts using detected pixel resolution when available
+  const quantify = useMemo(() => {
+    const res = typeof metrics?.pixel_resolution_m === 'number' && isFinite(metrics.pixel_resolution_m)
+      ? metrics.pixel_resolution_m as number
+      : null;
+    if (!res) return null;
+    const r2 = res * res;
+
+    const toNum = (v: any) => {
+      const n = typeof v === 'number' ? v : Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
+
+    const floodedPixels = toNum(metrics?.total_flooded_pixels ?? metrics?.new_water_pixels);
+    const vegetationPixels = toNum(metrics?.vegetation_loss_pixels);
+    const builtPixels = toNum(metrics?.built_structures_affected_pixels);
+
+    const calc = (px: number | null) => {
+      if (!px || px <= 0) return null;
+      const m2 = px * r2;
+      const ha = m2 / 10000;
+      return { m2, ha };
+    };
+
+    return {
+      flooded: calc(floodedPixels),
+      vegetation: calc(vegetationPixels),
+      built: calc(builtPixels),
+      resolution_m: res,
+    } as const;
+  }, [metrics]);
 
   return (
     <ScrollView 
@@ -336,11 +368,52 @@ export default function AnalyzeScreen() {
             </View>
           )}
 
-          {!metrics.pixel_resolution_m && (
-            <View className="bg-amber-50 rounded-lg p-3 border border-amber-200 mb-4">
-              <Text className="text-xs text-amber-800">
-                ⚠️ Pixel resolution not detected; area metrics unavailable.
-              </Text>
+          {/* Quantify Change - computed from pixels and resolution */}
+          {!!quantify && (
+            <View className="bg-gradient-to-b from-emerald-50 to-white rounded-xl p-4 mb-4 border border-emerald-200">
+              <Text className="text-base font-bold text-emerald-900 mb-3">🧮 Quantify Change</Text>
+
+              {/* Flooded land */}
+              <View className="mb-3">
+                <Text className="text-sm font-semibold text-gray-800">💧 Area of flooded land</Text>
+                <View className="flex-row items-baseline gap-2 mt-1">
+                  <Text className="text-lg font-bold text-gray-900">
+                    {quantify.flooded?.m2?.toFixed?.(2) ?? '—'}
+                  </Text>
+                  <Text className="text-xs text-gray-600">m²</Text>
+                </View>
+                <Text className="text-xs text-gray-700 mt-0.5">
+                  {quantify.flooded?.ha?.toFixed?.(4) ?? '—'} hectares
+                </Text>
+              </View>
+
+              {/* Vegetation lost */}
+              <View className="mb-3">
+                <Text className="text-sm font-semibold text-gray-800">🌿 Area of vegetation lost</Text>
+                <View className="flex-row items-baseline gap-2 mt-1">
+                  <Text className="text-lg font-bold text-gray-900">
+                    {quantify.vegetation?.m2?.toFixed?.(2) ?? '—'}
+                  </Text>
+                  <Text className="text-xs text-gray-600">m²</Text>
+                </View>
+                <Text className="text-xs text-gray-700 mt-0.5">
+                  {quantify.vegetation?.ha?.toFixed?.(4) ?? '—'} hectares
+                </Text>
+              </View>
+
+              {/* Built structures affected */}
+              <View>
+                <Text className="text-sm font-semibold text-gray-800">🏘️ Area of affected built structures</Text>
+                <View className="flex-row items-baseline gap-2 mt-1">
+                  <Text className="text-lg font-bold text-gray-900">
+                    {quantify.built?.m2?.toFixed?.(2) ?? '—'}
+                  </Text>
+                  <Text className="text-xs text-gray-600">m²</Text>
+                </View>
+                <Text className="text-xs text-gray-700 mt-0.5">
+                  {quantify.built?.ha?.toFixed?.(4) ?? '—'} hectares
+                </Text>
+              </View>
             </View>
           )}
 

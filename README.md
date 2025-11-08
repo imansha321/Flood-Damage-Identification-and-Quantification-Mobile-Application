@@ -1,4 +1,4 @@
-# Enhanced Flood Damage Analysis System
+# Flood Damage Analysis System
 
 ## 🎯 Overview
 
@@ -61,43 +61,47 @@ Flood/
 ## 🚀 Getting Started
 
 ### Prerequisites
-```bash
+
 # Backend
 python 3.8+
 pip install fastapi uvicorn opencv-python pillow numpy shapely rasterio geopandas scikit-image scipy pandas segment-anything torch torchvision
 
 # Frontend
+
 Node.js 16+
-npm or yarn
+npm 
 Expo CLI
-```
+
 
 ### Installation
 
 #### Backend Setup
-```bash
+
 cd Backend
 
 # Install dependencies
 pip install -r requirements.txt
 
 # Download SAM checkpoint
+
 # Place sam_vit_l_0b3195.pth in Backend/ directory
 
 # Start server
 python server.py
-```
+
 
 #### Frontend Setup
-```bash
+
 cd Flood
 
 # Install dependencies
 npm install
 
 # Start Expo development server
+npm run web
+
 npx expo start
-```
+
 
 ## 📖 Usage
 
@@ -286,42 +290,6 @@ npx expo start --clear
 # Check network connectivity
 ```
 
-## 📈 Performance
-
-### Typical Processing Times
-- Small images (< 1000px): 20-30 seconds
-- Medium images (1000-2000px): 30-45 seconds
-- Large images (> 2000px): 45-90 seconds
-
-### Optimization Tips
-1. Resize images before upload (recommended: 1500px max dimension)
-2. Use GPU for SAM inference
-3. Adjust SAM parameters for speed vs. quality:
-   ```python
-   points_per_side=16  # Faster, fewer masks
-   points_per_side=32  # Default balance
-   points_per_side=64  # Slower, more detailed
-   ```
-
-## 📚 Documentation
-
-- [Feature Update Guide](FEATURE_UPDATE.md)
-- [Color Coding Guide](COLOR_CODING_GUIDE.md)
-- [Pipeline Refactoring Notes](Backend/PIPELINE_REFACTORING.md)
-- [Backend README](Backend/README.md)
-
-## 🤝 Contributing
-
-Contributions welcome! Please:
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
-
-## 📄 License
-
-[Add your license here]
-
 ## 🙏 Acknowledgments
 
 - **SAM (Segment Anything Model)**: Meta AI Research
@@ -329,12 +297,3 @@ Contributions welcome! Please:
 - **Expo**: React Native development platform
 - **NativeWind**: Tailwind CSS for React Native
 
-## 📧 Contact
-
-[Add your contact information]
-
----
-
-**Version**: 2.0  
-**Last Updated**: November 2025  
-**Status**: Production Ready ✅
