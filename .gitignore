@@ -1,0 +1,61 @@
+# Root .gitignore for Flood-Damage-Identification-and-Quantification-Mobile-Application
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+ehthumbs.db
+desktop.ini
+*.swp
+*.swo
+*.tmp
+*.orig
+*.bak
+*.rej
+
+# IDEs
+.vscode/
+.idea/
+*.iml
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# Package manager caches
+.npm/
+.pnpm-store/
+.yarn/
+.yarn-cache/
+.yarnrc.yml
+
+# TypeScript
+*.tsbuildinfo
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Metro bundler cache (React Native / Expo)
+.metro/
+.metro-cache/
+
+# General build output
+build/
+dist/
+web-build/
+
+docs/
+
+# OS-specific (Windows)
+$RECYCLE.BIN/
+System Volume Information/

@@ -1,0 +1,63 @@
+# Python (Backend)
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Distribution / packaging
+build/
+dist/
+.eggs/
+*.egg-info/
+pip-wheel-metadata/
+
+# Environments
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+# Unit test / coverage reports
+.pytest_cache/
+.mypy_cache/
+.coverage
+coverage/
+htmlcov/
+.cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Tooling
+.pyre/
+.pytype/
+
+# Logs
+*.log
+logs/
+
+# Project outputs and large artifacts
+# Generated data and pipeline results
+pipeline_output/
+flood_pipeline_outputs/
+data/flood_pipeline_outputs/
+uploads/
+sam_masks_after/
+sam_masks_before/
+
+# Reports (generated)
+objects_change_report.csv
+objects_change_report.geojson
+**/uploads/**/*.csv
+**/uploads/**/*.geojson
+**/pipeline_output/**/*.csv
+**/pipeline_output/**/*.geojson
+
+# Model weights and large binaries
+*.pth
+*.pt
+*.onnx
