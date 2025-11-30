@@ -8,10 +8,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Backend base URL is injected via Expo config (extra.API_BASE)
 // Set it in Flood/.env as API_BASE=...
-const API_BASE: string =
-  ((Constants.expoConfig?.extra as any)?.API_BASE as string) ??
-  ((Constants.manifest as any)?.extra?.API_BASE as string) ??
-  'http://localhost:8000';
+// const API_BASE: string =
+//   ((Constants.expoConfig?.extra as any)?.API_BASE as string) ??
+//   'http://localhost:8000';
+
+const API_BASE = Constants.expoConfig?.extra?.API_BASE ?? 'http://localhost:8000';
+
+console.log('API Base URL:', API_BASE);
 
 /**
  * Flood Impact Analysis Screen

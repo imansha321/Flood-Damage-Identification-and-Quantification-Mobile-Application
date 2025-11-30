@@ -1,6 +1,14 @@
 // Load .env and merge into existing app.json so all settings are preserved
 const fs = require('fs');
 const path = require('path');
+import 'dotenv/config';
+
+export default ({ config }) => ({
+  ...config,
+  extra: {
+    API_BASE: process.env.API_BASE,
+  },
+});
 
 function loadEnv(dotenvPath) {
   try {

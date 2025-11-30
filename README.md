@@ -55,7 +55,7 @@ python server.py
 ```powershell
 cd Flood
 npm install
-npx expo start
+npx expo start -c
 # or: npm run web | npm run android | npm run ios
 ```
 
