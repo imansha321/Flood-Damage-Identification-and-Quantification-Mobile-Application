@@ -721,8 +721,8 @@ export default function AnalyzeScreen() {
               </View>
             </View>
           )}
-
-          {/* Color Legend */}
+          {/*
+           Color Legend 
           <View className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-4 mb-4 border border-gray-200">
             <Text className="text-sm font-bold text-gray-800 mb-3">🎨 Color Legend</Text>
             <View className="space-y-2">
@@ -744,6 +744,7 @@ export default function AnalyzeScreen() {
               </View>
             </View>
           </View>
+           */}
 
           {/* Download Buttons */}
           <View className="flex-row gap-3 mt-2">
