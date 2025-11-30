@@ -2,12 +2,16 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Linking, Image as RNImage, StyleSheet, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Paths, File } from 'expo-file-system';
+import Constants from 'expo-constants';
 import * as MediaLibrary from 'expo-media-library';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-// Adjust this to your backend server URL
-// For mobile device access, use your computer's local IP address
-const API_BASE = 'http://192.168.222.80:8000';
+// Backend base URL is injected via Expo config (extra.API_BASE)
+// Set it in Flood/.env as API_BASE=...
+const API_BASE: string =
+  ((Constants.expoConfig?.extra as any)?.API_BASE as string) ??
+  ((Constants.manifest as any)?.extra?.API_BASE as string) ??
+  'http://localhost:8000';
 
 /**
  * Flood Impact Analysis Screen

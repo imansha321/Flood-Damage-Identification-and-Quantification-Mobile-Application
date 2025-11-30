@@ -1,299 +1,184 @@
 # Flood Damage Analysis System
 
 ## 🎯 Overview
+Flood damage identification and quantification using before/after imagery. The backend performs SAM-based segmentation, alignment, and change detection; the Expo mobile app visualizes results and lets you download overlays, CSV, and GeoJSON.
 
-This enhanced flood damage identification and quantification system provides comprehensive analysis of flood impact through satellite/aerial imagery. The system uses AI-powered segmentation (SAM) combined with semantic classification to detect and quantify flood damage across three main categories.
+## ✨ Features
 
-## ✨ Key Features
+- **Metrics**: Flooded land, vegetation loss, and affected built structures (pixels, m², hectares when resolution is known)
+- **Overlays**: Color-coded polygons and pixel-change mask (before/after)
+- **Mobile UI**: React Native + Expo, styled with NativeWind
+- **Data Export**: CSV and GeoJSON per analysis
 
-### 📊 Comprehensive Metrics
-- **Flooded Land Area**: Total area covered by new water presence
-- **Vegetation Loss**: Area where greenery was destroyed
-- **Built Structures Affected**: Infrastructure impacted by flooding
-
-All metrics provided in:
-- Pixel counts
-- Square meters (m²)
-- Hectares (ha)
-
-### 🎨 Color-Coded Visualization
-- 🔵 **Blue**: Flooded areas
-- 🟢 **Green**: Vegetation loss
-- 🟠 **Orange**: Built structures affected
-- ⚪ **Gray**: No significant change
-
-### 🖼️ Segmentation Overlays
-- Side-by-side before/after comparison
-- Color-coded polygons showing change types
-- Transparent overlays to see original imagery
-
-### 📱 Modern Mobile UI
-- Built with React Native + Expo
-- Styled with NativeWind (Tailwind CSS)
-- Responsive cards with gradients
-- Professional presentation
-
-## 🏗️ Architecture
+## 🏗️ Project Structure
 
 ### Backend (Python + FastAPI)
 ```
 Backend/
-├── server.py                 # FastAPI server with /analyze/ endpoint
-├── sam.py                    # SAM mask generation + full pipeline
-├── flood_change_pipeline.py  # Object matching & semantic analysis
-├── geoJSON.py               # Overlay generation with color coding
-└── flood_analysis.py        # Pixel-level analysis
+├── server.py                 # FastAPI app exposing /analyze and results endpoints
+├── algorithm.py              # Core image ops, SAM helpers, IoU, proxies
+├── requirements.txt          # Python dependencies
+├── sam_vit_h_4b8939.pth      # SAM checkpoint (place here)
+└── uploads/                  # Per-request outputs (auto-created)
 ```
 
 ### Frontend (React Native + Expo)
 ```
 Flood/
-├── app/
-│   └── (tabs)/
-│       └── index.tsx        # Main analysis screen
-├── babel.config.js          # NativeWind configuration
-├── metro.config.js          # Metro bundler with CSS support
-├── tailwind.config.js       # Tailwind configuration
-├── global.css              # Tailwind directives
-└── nativewind-env.d.ts     # TypeScript definitions
+├── app/(tabs)/index.tsx      # Main analysis screen (set API_BASE here)
+├── tailwind.config.js        # Tailwind/NativeWind config
+├── global.css                # Tailwind directives
+└── package.json              # Expo app scripts/deps
 ```
 
-## 🚀 Getting Started
+## 🚀 Setup
 
 ### Prerequisites
+- Python 3.10+
+- Node.js 18+ (recommended for Expo SDK 54)
+- Git (for segment-anything dependency)
 
-# Backend
-python 3.8+
-pip install fastapi uvicorn opencv-python pillow numpy shapely rasterio geopandas scikit-image scipy pandas segment-anything torch torchvision
+### Backend (Windows PowerShell)
+```powershell
+# From repo root
+python -m venv .venv; . .\.venv\Scripts\Activate.ps1
+pip install -r Backend\requirements.txt
 
-# Frontend
+# Place SAM checkpoint in Backend\ (default name used by server.py)
+#   Backend\sam_vit_h_4b8939.pth
 
-Node.js 16+
-npm 
-Expo CLI
-
-
-### Installation
-
-#### Backend Setup
-
-cd Backend
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Download SAM checkpoint
-
-# Place sam_vit_l_0b3195.pth in Backend/ directory
-
-# Start server
+# Run server
 python server.py
+```
 
-
-#### Frontend Setup
-
+### Frontend
+```powershell
 cd Flood
-
-# Install dependencies
 npm install
-
-# Start Expo development server
-npm run web
-
 npx expo start
+# or: npm run web | npm run android | npm run ios
+```
 
+Environment config:
+```ini
+# Flood/.env
+API_BASE=http://<your-ip>:8000
+```
+The app reads `API_BASE` from `.env` via `app.config.js` (available at runtime as `Constants.expoConfig.extra.API_BASE`).
 
 ## 📖 Usage
 
-### 1. Upload Images
-- Tap "📷 Before" to select pre-flood image
-- Tap "📷 After" to select post-flood image
+1) In the app, pick “Before” and “After” images
+2) Tap “Start Analysis” and wait for processing
+3) View overlays and metrics; download CSV/GeoJSON as needed
 
-### 2. Run Analysis
-- Tap "🔍 Start Analysis" button
-- Wait for processing (typically 30-60 seconds)
+Outputs are written to `uploads/<request_id>/` and served at `/files/<request_id>/...`.
 
-### 3. View Results
-The app displays:
-- **Object counts**: Before/after comparison
-- **Flooded land area**: Blue-coded with area measurements
-- **Vegetation loss**: Green-coded with area measurements
-- **Built structures affected**: Orange-coded with area measurements
-- **Color legend**: Visual guide to overlay colors
-- **Segmentation overlays**: Side-by-side visualizations
+## 🔌 API
 
-### 4. Export Data
-- Tap "📍 GeoJSON" to download spatial data
-- Tap "📄 CSV Report" to download tabular data
+### POST `/analyze/`
+multipart/form-data with two files:
+- `before`: image (png/jpg)
+- `after`: image (png/jpg)
+- Optional query: `pixel_resolution_m` (meters per pixel)
 
-## 🎨 Color Coding System
-
-### Semantic Classifications
-The system classifies each detected object as:
-- **VEGETATION**: Green areas (ExG > 20)
-- **WATER**: Water bodies (G-R > 10, brightness < 90)
-- **POSSIBLE_WATER**: Water candidates
-- **BARE_SOIL**: Bare ground, roads, buildings
-
-### Change Detection Colors
-
-| Change Type | Color | RGB | Description |
-|------------|-------|-----|-------------|
-| New Water | 🔵 Blue | (0, 100, 255) | Areas now flooded |
-| Vegetation Loss | 🟢 Green | (50, 200, 0) | Lost greenery |
-| Structures Affected | 🟠 Orange | (255, 140, 0) | Buildings/infrastructure flooded |
-| No Change | ⚪ Gray | (180, 180, 180) | Stable areas |
-
-## 📊 API Response Format
-
+Example response:
 ```json
 {
   "message": "Analysis complete",
-  "request_id": "uuid-string",
-  "csv_url": "/files/uuid/objects_change_report.csv",
-  "geojson_url": "/files/uuid/objects_change_report.geojson",
+  "request_id": "<uuid>",
+  "csv_url": "/files/<uuid>/objects_change_report.csv",
+  "geojson_url": "/files/<uuid>/objects_change_report.geojson",
   "overlay_info": {
-    "before_overlay_url": "/files/uuid/before_with_polygons.png",
-    "after_overlay_url": "/files/uuid/after_with_polygons.png"
+    "before_overlay_url": "/files/<uuid>/before_with_polygons.png",
+    "after_overlay_url": "/files/<uuid>/after_with_polygons.png"
+  },
+  "pixel_analysis": {
+    "change_mask_url": "/files/<uuid>/pixel_change_mask.png",
+    "veg_loss_pixels": 1234,
+    "water_candidate_pixels": 5678,
+    "veg_loss_pct": 1.23,
+    "water_candidate_pct": 4.56,
+    "veg_loss_m2": 612.0,
+    "water_candidate_m2": 2345.0,
+    "veg_loss_ha": 0.0612,
+    "water_candidate_ha": 0.2345
   },
   "metrics": {
     "total_objects_before": 125,
     "total_objects_after": 140,
-    "vegetation_loss_pixels": 83000,
-    "new_water_pixels": 125000,
-    "built_structures_affected_pixels": 42000,
-    "total_flooded_pixels": 125000,
-    "pixel_resolution_m": 0.5,
-    "vegetation_loss_area_m2": 20750.0,
-    "vegetation_loss_area_ha": 2.075,
-    "new_water_area_m2": 31250.0,
-    "new_water_area_ha": 3.125,
-    "built_structures_affected_area_m2": 10500.0,
-    "built_structures_affected_area_ha": 1.05,
-    "total_flooded_area_m2": 31250.0,
-    "total_flooded_area_ha": 3.125
-  }
-}
-```
-
-## 🔧 Configuration
-
-### Backend Thresholds
-Edit in `flood_change_pipeline.py`:
-```python
-EXG_VEG_THRESHOLD = 20.0      # Excess Green threshold
-WATER_G_R_DIFF = 10.0         # Green-Red difference
-DARKNESS_BRIGHTNESS = 90.0    # Brightness threshold
-MIN_MASK_AREA_PIXELS = 500    # Minimum object size
-IOU_MATCH_THRESHOLD = 0.2     # Object matching IoU
-```
-
-### Frontend API Base URL
-Edit in `Flood/app/(tabs)/index.tsx`:
-```typescript
-const API_BASE = 'http://localhost:8000'; // Change for production
-```
-
-### Tailwind Colors
-Edit in `Flood/tailwind.config.js`:
-```javascript
-theme: {
-  extend: {
-    colors: {
-      primary: '#0ea5e9',    // Blue
-      secondary: '#16a34a',  // Green
-      accent: '#8b5cf6',     // Purple
-      danger: '#ef4444',     // Red
-    },
+    "matched_objects": 92,
+    "new_objects": 18,
+    "deleted_objects": 5,
+    "total_pixels": 2073600,
+    "pixel_resolution_m": 0.5
   },
+  "sam": { "before_masks": 300, "after_masks": 320 }
 }
 ```
 
-## 📁 Output Files
+### GET `/results/{request_id}`
+Returns quick availability summary and base files URL.
 
-### GeoJSON
-Contains polygon geometries with attributes:
-- `id`: Object identifier
-- `semantic_change`: Change classification
-- `area_before_px`, `area_after_px`: Pixel areas
-- `area_before_m2`, `area_after_m2`: Metric areas
-- `area_before_ha`, `area_after_ha`: Hectare areas
-- `iou`: Intersection over Union score
-- `status`: Match status
+### GET `/results/{request_id}/geojson` | `/overlay` | `/polygons`
+Download GeoJSON, legacy overlay image, or polygon coordinates JSON.
 
-### CSV Report
-Tabular format with columns:
-- before_id, after_id
-- iou, status
-- area_before_px, area_after_px
-- pct_change
-- semantic_change
-- RGB proxy values (ExG, G-R)
+## 🧠 How It Works (Pseudocode)
 
-### Overlay Images
-- `before_with_polygons.png`: Overlays on before image
-- `after_with_polygons.png`: Color-coded overlays on after image
+### Server (FastAPI)
+- On `POST /analyze/` with two images:
+  - Validate both files exist; create a new `request_id` and folder `uploads/<request_id>/`.
+  - Save files as `before.png` and `after.png`.
+  - Try to determine pixel resolution:
+    - Read PNG metadata (DPI) or adjacent world file; otherwise parse filename; allow `?pixel_resolution_m=` override.
+  - Load RGB images; align `after` to `before` (ECC) and histogram-match to reduce brightness/color drift.
+  - Load SAM checkpoint (env `SAM_CHECKPOINT_PATH` or `Backend/sam_vit_h_4b8939.pth`).
+  - Run SAM to create binary masks for both images; warp/flip as needed; save to `sam_masks_before/` and `sam_masks_after/`.
+  - Combine masks into label rasters; vectorize to polygons; compute per-polygon proxies (ExG, G-R, brightness).
+  - Assign semantic class per polygon via thresholds (vegetation, water, possible water, bare soil).
+  - Compute IoU between before/after polygons; perform Hungarian matching; tag results as `matched_same`, `possible_change`, `new_after`, or `deleted_after`.
+  - Compute pixel-level change masks (vegetation loss and water candidates); save `pixel_change_mask.png` and `pixel_change_summary.csv`.
+  - Render `before_with_polygons.png` and `after_with_polygons.png` overlays.
+  - Write `objects_change_report.csv` and, if any geometries, `objects_change_report.geojson`.
+  - Respond with JSON containing: relative URLs for CSV/GeoJSON/overlays, pixel-analysis metrics, object counts, and mask counts.
+- Serve static files under `/files/<request_id>/...` and helper GET endpoints to fetch GeoJSON/summary/polygons.
 
-## 🧪 Testing
+### Client (Expo app)
+- User picks two images (Before/After) via the image picker.
+- Build `FormData` with both files; `fetch(POST, API_BASE + '/analyze/')` without setting Content-Type manually.
+- Show loading spinner; wait for JSON response.
+- On success:
+  - Read `overlay_info` and build absolute URLs (`API_BASE + relative_path`); display before/after overlays.
+  - Read `metrics` and `pixel_analysis`; if `pixel_resolution_m` is present, compute areas in m²/ha from pixel counts.
+  - Show cards for objects before/after and three categories: flooded land, vegetation loss, built structures affected.
+  - Provide buttons to open CSV/GeoJSON in a browser.
+  - Enable overlay downloads:
+    - Web: fetch image, crop white margins with canvas, trigger download.
+    - Native: save image to gallery with `expo-media-library`.
+- `API_BASE` is set in `Flood/app/(tabs)/index.tsx`; for real devices, use your PC’s LAN IP.
 
-### Test with Sample Data
-```bash
-# Place test images in Backend/
-cp path/to/before.png Backend/before.png
-cp path/to/after.png Backend/after.png
+## 🎨 Legends & Classes
+- Blue: Flooded water / new water candidates
+- Green: Vegetation (used to quantify loss)
+- Orange: Built structures affected
+- Gray: No significant change / bare soil
 
-# Run standalone pipeline
-cd Backend
-python sam.py
-```
+Thresholds and heuristics are implemented in `Backend/algorithm.py` and `Backend/server.py`.
 
-### Expected Output
-```
-[STEP 1/4] Running SAM mask generation...
-[STEP 2/4] Running flood change pipeline...
-[STEP 3/4] Generating GeoJSON overlay visualization...
-[STEP 4/4] Running pixel-level flood analysis...
-[SUCCESS] Full pipeline completed successfully!
-```
+## ⚙️ Configuration
+- `Flood/app/(tabs)/index.tsx`: `API_BASE` for your backend URL
+- `Backend/server.py` CORS `allow_origins`: adjust for your LAN IP/ports
+- Pixel resolution is auto-detected (PNG metadata/world-file/filename); you can override with `?pixel_resolution_m=...`
 
-## 🐛 Troubleshooting
+## 📁 Outputs per request
+- `objects_change_report.csv`: object matches, IoU, semantic change, areas (px)
+- `objects_change_report.geojson`: polygons with attributes
+- `before_with_polygons.png`, `after_with_polygons.png`: overlays
+- `pixel_change_mask.png`, `pixel_change_summary.csv`: pixel-based analysis
 
-### Backend Issues
-
-**SAM checkpoint not found**
-```bash
-# Download from: https://github.com/facebookresearch/segment-anything#model-checkpoints
-# Place in Backend/ directory
-export SAM_CHECKPOINT_PATH=/path/to/sam_vit_l_0b3195.pth
-```
-
-**CUDA/GPU errors**
-```python
-# System will automatically fallback to CPU
-# For GPU support, install: pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
-```
-
-### Frontend Issues
-
-**NativeWind not working**
-```bash
-# Clear cache and restart
-npx expo start --clear
-
-# Verify babel.config.js has nativewind preset
-```
-
-**Images not uploading**
-```bash
-# Check CORS settings in server.py
-# Verify API_BASE URL is correct
-# Check network connectivity
-```
 
 ## 🙏 Acknowledgments
-
-- **SAM (Segment Anything Model)**: Meta AI Research
-- **FastAPI**: Modern Python web framework
-- **Expo**: React Native development platform
-- **NativeWind**: Tailwind CSS for React Native
+- Segment Anything (Meta AI)
+- FastAPI
+- Expo & NativeWind
 
