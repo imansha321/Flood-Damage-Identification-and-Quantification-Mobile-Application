@@ -1,0 +1,30 @@
+# ignore virtual environments
+venv/
+.venv/
+
+# node dependencies
+node_modules/
+
+# local build folders
+android/
+ios/
+
+# large image datasets
+*.png
+*.jpg
+*.jpeg
+data/
+dataset/
+images/
+outputs/
+results/
+
+# python cache
+__pycache__/
+*.pt
+*.pth
+*.h5
+
+# git stuff
+.git/
+.gitignore

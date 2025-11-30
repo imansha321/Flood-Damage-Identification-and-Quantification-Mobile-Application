@@ -1,11 +1,13 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Linking } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { View, Text, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Linking, Image as RNImage, StyleSheet, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { Image } from 'expo-image';
+import { Paths, File } from 'expo-file-system';
+import * as MediaLibrary from 'expo-media-library';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Adjust this to your backend server URL
-const API_BASE = 'http://localhost:8000';
+// For mobile device access, use your computer's local IP address
+const API_BASE = 'http://192.168.222.80:8000';
 
 /**
  * Flood Impact Analysis Screen
@@ -26,15 +28,75 @@ export default function AnalyzeScreen() {
   const [result, setResult] = useState<any>(null);
   const [beforeOverlayUrl, setBeforeOverlayUrl] = useState<string | null>(null);
   const [afterOverlayUrl, setAfterOverlayUrl] = useState<string | null>(null);
+  const [beforeOverlayAspect, setBeforeOverlayAspect] = useState<number | null>(null);
+  const [afterOverlayAspect, setAfterOverlayAspect] = useState<number | null>(null);
+
+  useEffect(() => {
+    let canceled = false;
+    if (beforeOverlayUrl) {
+      RNImage.getSize(
+        beforeOverlayUrl,
+        (width, height) => {
+          if (!canceled) {
+            setBeforeOverlayAspect(height ? width / height : null);
+          }
+        },
+        () => {
+          if (!canceled) {
+            setBeforeOverlayAspect(null);
+          }
+        },
+      );
+    } else {
+      setBeforeOverlayAspect(null);
+    }
+    return () => {
+      canceled = true;
+    };
+  }, [beforeOverlayUrl]);
+
+  useEffect(() => {
+    let canceled = false;
+    if (afterOverlayUrl) {
+      RNImage.getSize(
+        afterOverlayUrl,
+        (width, height) => {
+          if (!canceled) {
+            setAfterOverlayAspect(height ? width / height : null);
+          }
+        },
+        () => {
+          if (!canceled) {
+            setAfterOverlayAspect(null);
+          }
+        },
+      );
+    } else {
+      setAfterOverlayAspect(null);
+    }
+    return () => {
+      canceled = true;
+    };
+  }, [afterOverlayUrl]);
 
   const pickImage = useCallback(async (setter: (uri: string) => void) => {
+    // Request permissions first
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Sorry, we need camera roll permissions to select images.');
+      return;
+    }
+    
     const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: false,
       quality: 1,
     });
+    console.log('Image picker result:', res);
     if (!res.canceled && res.assets?.[0]?.uri) {
-      setter(res.assets[0].uri);
+      const uri = res.assets[0].uri;
+      console.log('Selected image URI:', uri);
+      setter(uri);
     }
   }, []);
 
@@ -46,28 +108,67 @@ export default function AnalyzeScreen() {
     try {
       setLoading(true);
       const form = new FormData();
+      
+      // Extract filename and detect MIME type from extension
       const beforeName = beforeUri.split('/').pop() || 'before.png';
       const afterName = afterUri.split('/').pop() || 'after.png';
       
-      // Fetch the image URIs as blobs for web compatibility
-      const beforeBlob = await fetch(beforeUri).then(r => r.blob());
-      const afterBlob = await fetch(afterUri).then(r => r.blob());
+      const getMimeType = (filename: string) => {
+        const ext = filename.split('.').pop()?.toLowerCase();
+        const mimeTypes: Record<string, string> = {
+          'jpg': 'image/jpeg',
+          'jpeg': 'image/jpeg',
+          'png': 'image/png',
+          'gif': 'image/gif',
+          'webp': 'image/webp',
+        };
+        return mimeTypes[ext || 'png'] || 'image/jpeg';
+      };
       
-      // Append as File objects (web) or fallback to RN format
-      form.append('before', beforeBlob, beforeName);
-      form.append('after', afterBlob, afterName);
+      // Build FormData: native vs web have different requirements
+      if (Platform.OS === 'web') {
+        // On web, ImagePicker returns blob: URLs. Convert them to File objects.
+        const beforeBlob = await fetch(beforeUri).then((r) => r.blob());
+        const afterBlob = await fetch(afterUri).then((r) => r.blob());
+        // Append blobs directly with filenames; avoids type conflicts with expo-file-system File
+        form.append('before', beforeBlob, beforeName);
+        form.append('after', afterBlob, afterName);
+      } else {
+        // React Native requires { uri, name, type }
+        // @ts-ignore - React Native FormData accepts this format
+        form.append('before', {
+          uri: beforeUri,
+          type: getMimeType(beforeName),
+          name: beforeName,
+        });
+        // @ts-ignore - React Native FormData accepts this format
+        form.append('after', {
+          uri: afterUri,
+          type: getMimeType(afterName),
+          name: afterName,
+        });
+      }
       
       const url = `${API_BASE}/analyze/`;
+      console.log('Uploading to:', url);
+      console.log('Before URI:', beforeUri);
+      console.log('After URI:', afterUri);
+      
       const resp = await fetch(url, {
         method: 'POST',
-        headers: { 'Accept': 'application/json' },
+        headers: { 
+          'Accept': 'application/json',
+          // Don't set Content-Type - let the browser/RN set it automatically with boundary
+        },
         body: form,
       });
       if (!resp.ok) {
         const txt = await resp.text();
+        console.error('Upload failed:', resp.status, txt);
         throw new Error(txt || `Upload failed: ${resp.status}`);
       }
       const data = await resp.json();
+      console.log('Upload successful:', data);
       setResult(data);
       if (typeof data?.metrics?.pixel_resolution_m === 'number') {
         setDetectedRes(data.metrics.pixel_resolution_m);
@@ -100,7 +201,160 @@ export default function AnalyzeScreen() {
     Linking.openURL(url);
   }, [result]);
 
+  const downloadImage = useCallback(async (imageUrl: string, filename: string) => {
+    try {
+      if (Platform.OS === 'web') {
+        // Web: fetch, trim white borders via canvas, then download
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        const blob = await fetch(imageUrl).then((r) => r.blob());
+        const blobUrl = URL.createObjectURL(blob);
+        await new Promise<void>((resolve, reject) => {
+          img.onload = () => resolve();
+          img.onerror = (e) => reject(e);
+          img.src = blobUrl;
+        });
+
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          // Fallback: open original
+          window.open(imageUrl, '_blank');
+          return;
+        }
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const { data, width, height } = imageData;
+
+        const isWhite = (r: number, g: number, b: number, a: number) => a === 255 && r === 255 && g === 255 && b === 255;
+        let top = 0, left = 0, right = width - 1, bottom = height - 1;
+
+        // Find top
+        while (top < height) {
+          let rowWhite = true;
+          for (let x = 0; x < width; x++) {
+            const i = (top * width + x) * 4;
+            if (!isWhite(data[i], data[i + 1], data[i + 2], data[i + 3])) { rowWhite = false; break; }
+          }
+          if (!rowWhite) break; top++;
+        }
+        // Find bottom
+        while (bottom >= 0) {
+          let rowWhite = true;
+          for (let x = 0; x < width; x++) {
+            const i = (bottom * width + x) * 4;
+            if (!isWhite(data[i], data[i + 1], data[i + 2], data[i + 3])) { rowWhite = false; break; }
+          }
+          if (!rowWhite) break; bottom--;
+        }
+        // Find left
+        while (left < width) {
+          let colWhite = true;
+          for (let y = top; y <= bottom; y++) {
+            const i = (y * width + left) * 4;
+            if (!isWhite(data[i], data[i + 1], data[i + 2], data[i + 3])) { colWhite = false; break; }
+          }
+          if (!colWhite) break; left++;
+        }
+        // Find right
+        while (right >= 0) {
+          let colWhite = true;
+          for (let y = top; y <= bottom; y++) {
+            const i = (y * width + right) * 4;
+            if (!isWhite(data[i], data[i + 1], data[i + 2], data[i + 3])) { colWhite = false; break; }
+          }
+          if (!colWhite) break; right--;
+        }
+
+        const cropW = Math.max(0, right - left + 1);
+        const cropH = Math.max(0, bottom - top + 1);
+        if (cropW > 0 && cropH > 0 && (left > 0 || top > 0 || right < width - 1 || bottom < height - 1)) {
+          const out = document.createElement('canvas');
+          out.width = cropW; out.height = cropH;
+          const octx = out.getContext('2d')!;
+          octx.drawImage(img, left, top, cropW, cropH, 0, 0, cropW, cropH);
+          out.toBlob((outBlob) => {
+            if (!outBlob) {
+              window.open(imageUrl, '_blank');
+              return;
+            }
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(outBlob);
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+          }, 'image/png');
+        } else {
+          // No white borders detected; download original
+          const a = document.createElement('a');
+          a.href = blobUrl; a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+        }
+        return;
+      }
+
+      // Request write-only access for photo library; avoid audio permission on Android 13+
+      const { status } = await MediaLibrary.requestPermissionsAsync(true, ['photo']);
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Sorry, we need media library permissions to save images.');
+        return;
+      }
+
+      // Show downloading message
+      Alert.alert('Downloading...', 'Please wait while we save the image.');
+
+      // Download the file using fetch and save with new API
+      const response = await fetch(imageUrl);
+      if (!response.ok) {
+        throw new Error('Download failed');
+      }
+      
+      const blob = await response.blob();
+      const file = new File(Paths.cache, filename);
+      
+      // Write the blob to the file
+      const arrayBuffer = await blob.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+      const writer = file.writableStream().getWriter();
+      await writer.write(uint8Array);
+      await writer.close();
+
+      // Save to media library
+      const asset = await MediaLibrary.createAssetAsync(file.uri);
+      await MediaLibrary.createAlbumAsync('Flood Analysis', asset, false);
+      
+      Alert.alert('Success!', `Image saved to your gallery in "Flood Analysis" album.`);
+    } catch (err: any) {
+      console.error('Download error:', err);
+      Alert.alert('Download failed', err?.message ?? 'Could not save image');
+    }
+  }, []);
+
+  const onDownloadBeforeOverlay = useCallback(() => {
+    if (!beforeOverlayUrl) return;
+    downloadImage(beforeOverlayUrl, 'flood_before_overlay.png');
+  }, [beforeOverlayUrl, downloadImage]);
+
+  const onDownloadAfterOverlay = useCallback(() => {
+    if (!afterOverlayUrl) return;
+    downloadImage(afterOverlayUrl, 'flood_after_overlay.png');
+  }, [afterOverlayUrl, downloadImage]);
+
+  const beforeOverlayStyle = beforeOverlayAspect
+    ? [overlayStyles.overlayImage, { aspectRatio: beforeOverlayAspect }]
+    : [overlayStyles.overlayImage, overlayStyles.overlayFallback];
+
+  const afterOverlayStyle = afterOverlayAspect
+    ? [overlayStyles.overlayImage, { aspectRatio: afterOverlayAspect }]
+    : [overlayStyles.overlayImage, overlayStyles.overlayFallback];
+
   const metrics = result?.metrics ?? {};
+  const pixelAnalysis = result?.pixel_analysis ?? {};
   
   // Helpers
   const isNum = (v: any) => typeof v === 'number' && isFinite(v);
@@ -127,8 +381,13 @@ export default function AnalyzeScreen() {
       return Number.isFinite(n) ? n : null;
     };
 
-    const floodedPixels = toNum(metrics?.total_flooded_pixels ?? metrics?.new_water_pixels);
-    const vegetationPixels = toNum(metrics?.vegetation_loss_pixels);
+    // Prefer backend pixel_analysis values when available
+    const floodedPixels = toNum(
+      metrics?.total_flooded_pixels ?? metrics?.new_water_pixels ?? pixelAnalysis?.water_candidate_pixels
+    );
+    const vegetationPixels = toNum(
+      metrics?.vegetation_loss_pixels ?? pixelAnalysis?.veg_loss_pixels
+    );
     const builtPixels = toNum(metrics?.built_structures_affected_pixels);
 
     const calc = (px: number | null) => {
@@ -202,7 +461,11 @@ export default function AnalyzeScreen() {
         <View className="flex-row gap-3">
           {beforeUri ? (
             <View className="flex-1">
-              <Image source={{ uri: beforeUri }} className="w-full h-40 rounded-xl" contentFit="cover"/>
+              <RNImage 
+                source={{ uri: beforeUri }} 
+                style={{ width: '100%', height: 160, borderRadius: 12 }}
+                resizeMode="cover"
+              />
               <View className="absolute top-2 left-2 bg-black/60 rounded-lg px-2 py-1">
                 <Text className="text-white text-xs font-semibold">Before</Text>
               </View>
@@ -215,7 +478,11 @@ export default function AnalyzeScreen() {
           
           {afterUri ? (
             <View className="flex-1">
-              <Image source={{ uri: afterUri }} className="w-full h-40 rounded-xl" contentFit="cover"/>
+              <RNImage 
+                source={{ uri: afterUri }} 
+                style={{ width: '100%', height: 160, borderRadius: 12 }}
+                resizeMode="cover"
+              />
               <View className="absolute top-2 left-2 bg-black/60 rounded-lg px-2 py-1">
                 <Text className="text-white text-xs font-semibold">After</Text>
               </View>
@@ -260,19 +527,25 @@ export default function AnalyzeScreen() {
           </Text>
           <Text className="text-sm text-gray-600 mb-4">Color-coded by change type</Text>
           
-          <View className="flex-row gap-3">
+          <View className="flex-col">
             {!!beforeOverlayUrl && (
-              <View className="flex-1">
+              <View className="flex-1 mb-4">
                 <View className="bg-gradient-to-r from-purple-100 to-blue-100 rounded-lg p-2 mb-2">
                   <Text className="text-xs font-semibold text-gray-700 text-center">
                     Before (with segments)
                   </Text>
                 </View>
-                <Image 
+                <RNImage 
                   source={{ uri: beforeOverlayUrl }} 
-                  className="w-full h-48 rounded-xl border-2 border-gray-200" 
-                  contentFit="contain"
+                  style={beforeOverlayStyle}
+                  resizeMode="contain"
                 />
+                <TouchableOpacity 
+                  className="mt-3 bg-purple-600 rounded-xl py-3 px-4 shadow-md active:bg-purple-700"
+                  onPress={onDownloadBeforeOverlay}
+                >
+                  <Text className="text-white font-semibold text-center">⬇️ Download Before Overlay</Text>
+                </TouchableOpacity>
               </View>
             )}
             {!!afterOverlayUrl && (
@@ -282,11 +555,17 @@ export default function AnalyzeScreen() {
                     After (color by change)
                   </Text>
                 </View>
-                <Image 
+                <RNImage 
                   source={{ uri: afterOverlayUrl }} 
-                  className="w-full h-48 rounded-xl border-2 border-gray-200" 
-                  contentFit="contain"
+                  style={afterOverlayStyle}
+                  resizeMode="contain"
                 />
+                <TouchableOpacity 
+                  className="mt-3 bg-green-600 rounded-xl py-3 px-4 shadow-md active:bg-green-700"
+                  onPress={onDownloadAfterOverlay}
+                >
+                  <Text className="text-white font-semibold text-center">⬇️ Download After Overlay</Text>
+                </TouchableOpacity>
               </View>
             )}
           </View>
@@ -331,7 +610,7 @@ export default function AnalyzeScreen() {
                 <Text className="text-sm font-bold text-blue-900">💧 Flooded Land Area</Text>
               </View>
               <Text className="text-xs text-blue-700 mb-1">
-                {fmt(metrics.total_flooded_pixels ?? metrics.new_water_pixels, 0)} pixels
+                {fmt((metrics.total_flooded_pixels ?? metrics.new_water_pixels ?? pixelAnalysis.water_candidate_pixels), 0)} pixels
               </Text>
               <Text className="text-xl font-bold text-blue-900 mt-1">
                 {fmt(areas.flooded_m2, 2)} m²
@@ -348,7 +627,7 @@ export default function AnalyzeScreen() {
                 <Text className="text-sm font-bold text-green-900">🌿 Vegetation Loss</Text>
               </View>
               <Text className="text-xs text-green-700 mb-1">
-                {fmt(metrics.vegetation_loss_pixels, 0)} pixels
+                {fmt((metrics.vegetation_loss_pixels ?? pixelAnalysis.veg_loss_pixels), 0)} pixels
               </Text>
               <Text className="text-xl font-bold text-green-900 mt-1">
                 {fmt(areas.veg_m2, 2)} m²
@@ -483,3 +762,15 @@ export default function AnalyzeScreen() {
     </ScrollView>
   );
 }
+
+
+const overlayStyles = StyleSheet.create({
+  overlayImage: {
+    width: '100%',
+    // ensure the image doesn't overflow when using aspectRatio/contain
+    overflow: 'hidden',
+  },
+  overlayFallback: {
+    height: 180,
+  },
+});
