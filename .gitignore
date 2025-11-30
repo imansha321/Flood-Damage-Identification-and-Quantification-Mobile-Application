@@ -26,10 +26,7 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Env files
-.env
-.env.*
-!.env.example
+
 
 # Package manager caches
 .npm/
